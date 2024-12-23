@@ -92,7 +92,9 @@ Route::group(['middleware' => ['auth', '2fa', 'isActive', setting('email_verific
         Route::get('', [DepositController::class, 'deposit'])->name('amount');
         Route::get('gateway/{code}', [GatewayController::class, 'gateway'])->name('gateway');
         Route::get('suitpay')->name('suitpay');
-        Route::get('suitpay/confirmar', [DepositController::class, 'confirmar'])->name('confirmar.suitpay');
+        Route::get('suitpay/confirmar', [DepositController::class, 'confirmarSuitpay'])->name('confirmar.suitpay');
+        Route::get('zendry')->name('zendry');
+        Route::get('zendry/confirmar', [DepositController::class, 'confirmarZendry'])->name('confirmar.zendry');
         Route::post('now', [DepositController::class, 'depositNow'])->name('now');
         Route::get('log', [DepositController::class, 'depositLog'])->name('log');
     });

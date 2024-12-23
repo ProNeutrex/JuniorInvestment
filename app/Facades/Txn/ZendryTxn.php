@@ -2,12 +2,75 @@
 
 namespace App\Facades\Txn;
 
+use App\Models\User;
 use App\Models\Gateway;
+use App\Models\Transaction;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ZendryTxn {
 
     public function __construct()
     {
+    }
+
+    public function confirmQrCodePayment(Request $request)
+    {
+        // Obter o ClientSecret (cs) do gateway configurado
+        $gateway = Gateway::where('gateway_code', 'suitpay')->first();
+        $clientSecret = json_decode($gateway->credentials, true)['cs'];
+
+        // Dados recebidos no webhook
+        $data = $request->all();
+
+        // Validação do hash
+        $hashString = $data['idTransaction'] . $data['typeTransaction'] . $data['statusTransaction'] . $data['value'] . $data['payerName'] . $data['payerTaxId'] . $data['paymentDate'] . $data['paymentCode'] . $data['requestNumber'];
+        $expectedHash = hash('sha256', $hashString . $clientSecret);
+
+        if ($expectedHash !== $data['hash']) {
+            // Se o hash não for válido, rejeitar a requisição
+            Log::error('Hash inválido no webhook de PIX', ['data' => $data]);
+            return response()->json(['error' => 'Invalid hash'], 400);
+        }
+
+        // Verificar se a transação existe com o `requestNumber`
+        $transaction = Transaction::where('tnx', $data['idTransaction'])->first();
+
+        if (!$transaction) {
+            // Se a transação não for encontrada, registrar o erro
+            Log::error('Transação não encontrada', ['requestNumber' => $data['requestNumber']]);
+            return response()->json(['error' => 'Transaction not found'], 404);
+        }
+
+        // Atualizar o status da transação com base no status recebido
+        if ($data['statusTransaction'] === 'PAID_OUT') {
+            $transaction->status = 'success';
+            $responseMessage = 'Transaction updated successfully';
+        } elseif ($data['statusTransaction'] === 'CHARGEBACK') {
+            $transaction->status = 'chargeback';
+            $responseMessage = 'Transaction marked as chargeback';
+        } else {
+            $responseMessage = 'Transaction status updated but no change in status';
+        }
+
+        // Atualizar saldo do usuário
+        $user = User::find($transaction->user_id);
+        if ($user) {
+            $user->balance += $transaction->amount;
+            $user->save();
+        }
+
+        // Salvar transação 
+        $transaction->save();
+
+        // Verificar se a requisição é um webhook ou AJAX
+        if ($request->is('api/*')) {
+            return response()->json(['message' => $responseMessage], 200);
+        }
+
+        // Se não for uma requisição API (possivelmente uma requisição AJAX)
+        return response()->json(['message' => $responseMessage], 200);
     }
 
     public function createPayment($info, $gatewayInfo)
