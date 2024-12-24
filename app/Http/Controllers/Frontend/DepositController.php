@@ -91,11 +91,10 @@ class DepositController extends GatewayController
 
         $txnInfo = Txn::new($input['amount'], $charge, $finalAmount, $gatewayInfo->gateway_code, 'Depósito via ' . $gatewayInfo->name, $depositType, TxnStatus::Pending, $gatewayInfo->currency, $payAmount, auth()->id(), null, 'User', $manualData ?? []);
 
-        if ($txnInfo->method == 'Suitpay-brl') {
-            // Vamos chamar a SuitPay 
+        if ($input['gateway_code'] == 'suitpay') {
             $suit = $this->suitpay($txnInfo, $gatewayInfo);
             return $suit;
-        } else if ($txnInfo->method == 'Zendry') {
+        } else if ($input['gateway_code'] == 'zendry') {
             // Vamos chamar a SuitPay 
             $suit = $this->zendry($txnInfo, $gatewayInfo);
             return $suit;
@@ -209,11 +208,11 @@ class DepositController extends GatewayController
      * @param $valor 
      * @param $gateway
      */
-    public function zendry($info, $gatewayInfo)
+    public function zendry($txnInfo, $gatewayInfo)
     {
         $user = auth()->user();
 
-        $response = $this->zendryTxn->createPayment($info, $gatewayInfo);
+        $response = $this->zendryTxn->createPayment($txnInfo, $gatewayInfo);
 
         if ($response['status'] == 'error') {
             notify()->error($response['message'], 'Error');

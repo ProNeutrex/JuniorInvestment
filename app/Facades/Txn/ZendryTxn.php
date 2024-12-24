@@ -43,16 +43,17 @@ class ZendryTxn
         }
 
         // Verificar se a transação existe com o `reference_code`
-        $transaction = Transaction::where('tnx', $data['reference_code'])->first();
+        $referenceCode = $data['message']['reference_code'];
+        $transaction = Transaction::where('external_reference', $referenceCode)->first();
 
         if (!$transaction) {
             // Se a transação não for encontrada, registrar o erro
-            Log::error('Transação não encontrada', ['reference_code' => $data['reference_code']]);
+            Log::error('Transação não encontrada', ['reference_code' => $referenceCode]);
             return response()->json(['error' => 'Transaction not found'], 404);
         }
 
         // Atualizar o status da transação com base no status recebido
-        if ($data['status'] === 'paid') {
+        if ($data['message']['status'] === 'paid') {
             $transaction->status = 'success';
             $responseMessage = 'Transaction updated successfully';
         } else {
@@ -78,20 +79,18 @@ class ZendryTxn
         return response()->json(['message' => $responseMessage], 200);
     }
 
-    public function createPayment($info, $gatewayInfo)
+    public function createPayment($txnInfo, $gatewayInfo)
     {
         $accessTokenResponse = $this->getAccessToken($gatewayInfo);
 
         // Verificar se a resposta contém o "access_token"
         if (isset($accessTokenResponse['access_token'])) {
 
-            $qrCodeResponse = $this->generatePixQrCode($info, $accessTokenResponse);
+            $qrCodeResponse = $this->generatePixQrCode($txnInfo, $accessTokenResponse);
 
             $qrCode = $qrCodeResponse['qrcode'];
 
             if (!isset($qrCode)) {
-                // notify()->error('Não foi possível efetuar o depósito agora, tente novamente mais tarde', 'Error');
-                // return redirect()->back()->with('error', 'Não foi possível efetuar o depósito agora, tente novamente mais tarde');
                 return [
                     'status' => 'error',
                     'message' => 'Não foi possível efetuar o depósito agora, tente novamente mais tarde'
@@ -100,8 +99,9 @@ class ZendryTxn
 
             $paymentCode = $qrCode['reference_code'];
             $paymentCodeBase64 = $qrCode['image_base64'];
-            // Exibir o paymentCode e o QR code em base64
-            // return view('frontend.money_invest.deposit.suitpay', compact('paymentCode', 'paymentCodeBase64'));
+            $txnInfo['external_reference'] = $paymentCode;
+            $txnInfo->save();
+
             return [
                 'status' => 'success',
                 'message' => [
@@ -110,9 +110,6 @@ class ZendryTxn
                 ]
             ];
         } else {
-            // notify()->error('Não foi possível efetuar o depósito agora, tente novamente mais tarde', 'Error');
-            // return redirect()->back()->with('error', 'Não foi possível efetuar o depósito agora, tente novamente mais tarde');
-
             return [
                 'status' => 'error',
                 'message' => 'Não foi possível efetuar o depósito agora, tente novamente mais tarde'
@@ -168,7 +165,7 @@ class ZendryTxn
         return $decodedResponse;
     }
 
-    private function generatePixQrCode($info, $decodedResponse)
+    private function generatePixQrCode($txnInfo, $decodedResponse)
     {
 
         $headers = [
@@ -176,14 +173,14 @@ class ZendryTxn
             'Content-Type: application/json'
         ];
 
-        $depositAmount = $this->convertDecimalToCentsString($info->pay_amount);
+        $depositAmount = $this->convertDecimalToCentsString($txnInfo->pay_amount);
 
         $data = [
             "value_cents" => $depositAmount,
             "generator_name" => "John Doe",
             "generator_document" => "927.300.300-18",
             "expiration_time" => "1800",
-            "external_reference" => "Teste2"
+            "external_reference" => $txnInfo->tnx
         ];
 
         // Inicializar cURL
