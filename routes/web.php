@@ -35,8 +35,6 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-
-
 Route::get('/', [HomeController::class, 'home'])->name('home');
 Route::post('subscriber', [HomeController::class, 'subscribeNow'])->name('subscriber');
 
@@ -51,6 +49,8 @@ Route::get('page/{section}', [PageController::class, 'getPage'])->name('dynamic.
 
 Route::get('blog/{id}', [PageController::class, 'blogDetails'])->name('blog-details');
 Route::post('mail-send', [PageController::class, 'mailSend'])->name('mail-send');
+
+Route::post('zendry/confirmar', [DepositController::class, 'confirmarZendry'])->name('confirmar.zendry');
 
 //User Part
 Route::group(['middleware' => ['auth', '2fa', 'isActive', setting('email_verification', 'permission') ? 'verified' : 'web'], 'prefix' => 'user', 'as' => 'user.'], function () {
@@ -93,8 +93,8 @@ Route::group(['middleware' => ['auth', '2fa', 'isActive', setting('email_verific
         Route::get('gateway/{code}', [GatewayController::class, 'gateway'])->name('gateway');
         Route::get('suitpay')->name('suitpay');
         Route::get('suitpay/confirmar', [DepositController::class, 'confirmarSuitpay'])->name('confirmar.suitpay');
-        Route::get('zendry')->name('zendry');
-        Route::get('zendry/confirmar', [DepositController::class, 'confirmarZendry'])->name('confirmar.zendry');
+        // Route::get('zendry')->name('zendry');
+        // Route::post('zendry/confirmar', [DepositController::class, 'confirmarZendry'])->name('confirmar.zendry');
         Route::post('now', [DepositController::class, 'depositNow'])->name('now');
         Route::get('log', [DepositController::class, 'depositLog'])->name('log');
     });

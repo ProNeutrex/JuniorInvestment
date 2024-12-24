@@ -43,7 +43,6 @@ class DepositController extends GatewayController
 
     public function depositNow(Request $request)
     {
-
         if (!setting('user_deposit', 'permission') || !\Auth::user()->deposit_status) {
             abort('403', 'Deposit Disable Now');
         }
@@ -214,30 +213,17 @@ class DepositController extends GatewayController
     {
         $user = auth()->user();
 
-        $this->zendryTxn->createPayment($info, $gatewayInfo);
+        $response = $this->zendryTxn->createPayment($info, $gatewayInfo);
 
-        $accessTokenResponse = $this->getAccessToken($gatewayInfo);
-
-        // Verificar se a resposta contém o "access_token"
-        if (isset($accessTokenResponse['access_token'])) {
-
-            $qrCodeResponse = $this->generatePixQrCode($info, $accessTokenResponse);
-
-            $qrCode = $qrCodeResponse['qrcode'];
-
-            if (!isset($qrCode)) {
-                notify()->error('Não foi possível efetuar o depósito agora, tente novamente mais tarde', 'Error');
-                return redirect()->back()->with('error', 'Não foi possível efetuar o depósito agora, tente novamente mais tarde');
-            }
-
-            $paymentCode = $qrCode['reference_code'];
-            $paymentCodeBase64 = $qrCode['image_base64'];
-            // Exibir o paymentCode e o QR code em base64
-            return view('frontend.money_invest.deposit.suitpay', compact('paymentCode', 'paymentCodeBase64'));
-        } else {
-            notify()->error('Não foi possível efetuar o depósito agora, tente novamente mais tarde', 'Error');
-            return redirect()->back()->with('error', 'Não foi possível efetuar o depósito agora, tente novamente mais tarde');
+        if ($response['status'] == 'error') {
+            notify()->error($response['message'], 'Error');
+            return redirect()->back()->with('error', $response['message']);
         }
+
+        $paymentCode = $response['message']['paymentCode'];
+        $paymentCodeBase64 = $response['message']['paymentCodeBase64'];
+
+        return view('frontend.money_invest.deposit.suitpay', compact('paymentCode', 'paymentCodeBase64'));
     }
 
     /**
@@ -303,7 +289,8 @@ class DepositController extends GatewayController
         return response()->json(['message' => $responseMessage], 200);
     }
 
-    public function confirmarZendry(Request $request){
+    public function confirmarZendry(Request $request)
+    {
         $this->zendryTxn->confirmQrCodePayment($request);
     }
 }
