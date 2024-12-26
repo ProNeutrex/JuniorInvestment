@@ -303,7 +303,7 @@ class WithdrawController extends Controller
         }
 
 
-        $user->decrement($carteira, $totalAmount);
+        $user->decrement($carteira, $amount);
 
         $payAmount = $amount * $withdrawMethod->rate;
 
