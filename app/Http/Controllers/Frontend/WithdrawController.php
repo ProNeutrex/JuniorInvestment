@@ -75,7 +75,7 @@ class WithdrawController extends Controller
 
         $userId = auth()->id();
         $withdrawMethodId = $request->withdraw_method_id;
-        $methodName = $withdrawMethodId != 3 || $withdrawMethodId != 5 ? $request->method_name : 'PIX Automático';
+        $methodName = ($withdrawMethodId != 3 && $withdrawMethodId != 5) ? $request->method_name : 'PIX Automático';
 
         // Preparar dados de credenciais
         $credentials = $this->prepareCredentials($request, $withdrawMethodId);
@@ -290,13 +290,13 @@ class WithdrawController extends Controller
         }
 
         $charge = $withdrawMethod->charge_type == 'percentage' ? (($withdrawMethod->charge / 100) * $amount) : $withdrawMethod->charge;
-        $totalAmount = $amount + (float) $charge;
+        $totalAmount = $amount - (float) $charge;
 
         $user = Auth::user();
 
         $carteira = $request->carteira;
 
-        if ($user->$carteira < $totalAmount) {
+        if ($user->$carteira < $amount) {
             notify()->error(__('Saldo insuficiente, por favor mova fundos entre as carteiras para processar o saque'), 'Error');
 
             return redirect()->back();
