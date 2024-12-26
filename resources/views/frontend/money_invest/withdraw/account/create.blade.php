@@ -61,7 +61,7 @@
             var id = $(this).val();
 
             // Verificar se o método selecionado é igual a 3
-            if (id == 3) {
+            if (id == 3 || id == 5) {
                 // Adicionar campo Chave PIX
                 $('.additionalFields').append(`
                     <div class="col-lg-12">

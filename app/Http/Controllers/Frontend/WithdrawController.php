@@ -21,12 +21,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Session;
 use Txn;
+use App\Facades\Txn\ZendryTxn;
 use Validator;
 use App\Models\Gateway;
 
 class WithdrawController extends Controller
 {
     use ImageUpload, NotifyTrait, Payment;
+
+    private $zendryTxn;
+
+    public function __construct()
+    {
+        $this->zendryTxn = new ZendryTxn();
+    }
 
     /**
      * Display a listing of the resource.
@@ -48,7 +56,7 @@ class WithdrawController extends Controller
     public function store(Request $request)
     {
         // Validação básica para o método de retirada
-        if ($request->withdraw_method_id == 3) {
+        if ($request->withdraw_method_id == 3 || $request->withdraw_method_id == 5) {
             $validator = Validator::make($request->all(), [
                 'withdraw_method_id' => 'required',
                 'tipo' => 'required',
@@ -67,7 +75,7 @@ class WithdrawController extends Controller
 
         $userId = auth()->id();
         $withdrawMethodId = $request->withdraw_method_id;
-        $methodName = $withdrawMethodId != 3 ? $request->method_name : 'PIX Automático';
+        $methodName = $withdrawMethodId != 3 || $withdrawMethodId != 5 ? $request->method_name : 'PIX Automático';
 
         // Preparar dados de credenciais
         $credentials = $this->prepareCredentials($request, $withdrawMethodId);
@@ -87,7 +95,7 @@ class WithdrawController extends Controller
     // Método para preparar as credenciais com base no método de retirada
     private function prepareCredentials(Request $request, $withdrawMethodId)
     {
-        if ($withdrawMethodId == 3) {
+        if ($withdrawMethodId == 3 || $request->withdraw_method_id == 5) {
             // Unir tipo e chave PIX
             return [
                 'Chave PIX' => [
@@ -235,7 +243,6 @@ class WithdrawController extends Controller
      */
     public function withdrawNow(Request $request)
     {
-
         if (!setting('user_withdraw', 'permission') || !\Auth::user()->withdraw_status) {
             abort('403', __('Withdraw Disable Now'));
         }
@@ -318,7 +325,7 @@ class WithdrawController extends Controller
             json_decode($withdrawAccount->credentials, true)
         );
 
-        if ($withdrawMethod->type == 'auto' && $withdrawMethod->id != 3) {
+        if ($withdrawMethod->type == 'auto' && $withdrawMethod->id != 3 && $withdrawMethod->id != 5) {
             $gatewayCode = $withdrawMethod->gateway->gateway_code;
 
             return self::withdrawAutoGateway($gatewayCode, $txnInfo);
@@ -350,9 +357,25 @@ class WithdrawController extends Controller
 
         // Chamos a SuitPay 
         if ($withdrawMethod->id == 3) {
-            return $this->suitpay($withdrawAccount, $txnInfo, $totalAmount, $withdrawAccount,$notify);
-        }
+            return $this->suitpay($withdrawAccount, $txnInfo, $totalAmount, $withdrawAccount, $notify);
+        } elseif ($withdrawMethod->id == 5) {
 
+            $result = $this->zendryWhitdraw($txnInfo, $totalAmount, $withdrawAccount, $notify);
+
+             // Exibindo o resultado
+             if ($result['success']) {
+                // Atualizar status da transação
+                $txnInfo->status = 'success';
+                $txnInfo->save();
+
+                return view('frontend::withdraw.success', compact('notify'));
+            } else {
+                // Atualizar status da transação
+                $txnInfo->status = 'pending';
+                $txnInfo->save();
+                return view('frontend::withdraw.success', compact('notify'));
+            }
+        }
 
         return redirect()->route('user.notify');
     }
@@ -371,7 +394,7 @@ class WithdrawController extends Controller
         $ci = $credentials['ci'];
 
         // Info do usuário 
-        $dados =  json_decode($formData->credentials, true);
+        $dados = json_decode($formData->credentials, true);
         $tipo = $dados['Chave PIX']['type'];
         $chave = $dados['Chave PIX']['value'];
         // Pesquisar a transação
@@ -430,7 +453,20 @@ class WithdrawController extends Controller
         }
     }
 
-    
+    public function zendryWhitdraw($txnInfo, $totalAmount, $withdrawAccount, $notify)
+    {
+        $user = auth()->user();
+
+        $response = $this->zendryTxn->createWhitdraw($txnInfo, $totalAmount, $withdrawAccount);
+
+        if ($response['status'] == 'error') {
+            notify()->error($response['message'], 'Error');
+            return redirect()->back()->with('error', $response['message']);
+        }
+
+        return view('frontend::withdraw.success', compact('notify'));
+    }
+
     private function makeRequest($url, $headers, $data)
     {
         $ch = curl_init($url);

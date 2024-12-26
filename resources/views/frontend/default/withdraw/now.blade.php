@@ -43,7 +43,7 @@
                                 <div class="col-xl-6 col-md-12">
                                     <label for="exampleFormControlInput1" class="form-label">Sacar de qual carteira?</label>
                                     <div class="input-group">
-                                        <select name="carteira" id="wallet" class="site-nice-select">
+                                        <select name="withdraw_account" id="wallet" class="site-nice-select">
                                             <option selected disabled>Selecione a carteira</option>
                                             <option value="profit_balance">Carteira de lucros {{number_format($user->profit_balance,2)}} {{$currency}}</option>
                                             <option value="balance">Carteira Principal {{number_format($user->balance,2)}} {{$currency}}</option>

@@ -79,9 +79,9 @@ class ZendryTxn
         return response()->json(['message' => $responseMessage], 200);
     }
 
-    public function createPayment($txnInfo, $gatewayInfo)
+    public function createPayment($txnInfo)
     {
-        $accessTokenResponse = $this->getAccessToken($gatewayInfo);
+        $accessTokenResponse = $this->getAccessToken();
 
         // Verificar se a resposta contém o "access_token"
         if (isset($accessTokenResponse['access_token'])) {
@@ -117,10 +117,10 @@ class ZendryTxn
         }
     }
 
-    private function getAccessToken($gatewayInfo)
+    private function getAccessToken()
     {
-        $suitpay = Gateway::find($gatewayInfo->gateway_id);
-        $credentials = json_decode($suitpay->credentials, true);
+        $zendry = Gateway::where('gateway_code', 'zendry')->first();
+        $credentials = json_decode($zendry->credentials, true);
         $clientId = $credentials['client_id'];
         $clientSecret = $credentials['client_secret'];
         $keyAuthorization = base64_encode($clientId . ':' . $clientSecret);
@@ -189,6 +189,106 @@ class ZendryTxn
         // Configurar opções do cURL
         curl_setopt_array($curl, [
             CURLOPT_URL => 'https://api.zendry.com.br/v1/pix/qrcodes',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_POSTFIELDS => json_encode($data),
+        ]);
+
+        // Executar a requisição e capturar a resposta
+        $response = curl_exec($curl);
+
+        // Verificar se ocorreu erro
+        if (curl_errno($curl)) {
+            $error_msg = curl_error($curl);
+            echo "Erro: $error_msg";
+            return;
+        }
+
+        // Fechar cURL
+        curl_close($curl);
+
+        // Decodificar a resposta JSON
+        return json_decode($response, true);
+    }
+
+    public function createWhitdraw($txnInfo, $totalAmount, $withdrawAccount)
+    {
+        $accessTokenResponse = $this->getAccessToken();
+
+        // Verificar se a resposta contém o "access_token"
+        if (isset($accessTokenResponse['access_token'])) {
+
+            $whitdrawPix = $this->createWhitdrawPix($txnInfo, $totalAmount, $withdrawAccount, $accessTokenResponse);
+
+            if (isset($whitdrawPix['payment']['reference_code'])) {
+                $wPix = $whitdrawPix['payment']['reference_code'];
+                $txnInfo['external_reference'] = $wPix;
+                $txnInfo->save();
+
+                return [
+                    'status' => 'success',
+                    'message' => 'Pagamento realizado com sucesso'
+                ];
+            } else {
+
+                return [
+                    'status' => 'error',
+                    'message' => 'Não foi possível efetuar o saque agora, tente novamente mais tarde'
+                ];
+            }
+        }
+    }
+
+    private function createWhitdrawPix($txnInfo, $totalAmount, $withdrawAccount, $decodedResponse)
+    {
+        $pixData = json_decode($withdrawAccount->credentials, true);
+        $pixTypeKey = $pixData['Chave PIX']['type'];
+        $pixKey = $pixData['Chave PIX']['value'];
+
+        // Pesquisar a transação
+        if ($pixData) {
+
+            switch ($pixTypeKey) {
+                case 'CPF':
+                    $pixTypeKey = 'cpf';
+                    break;
+                case 'E-mail':
+                    $pixTypeKey = 'email';
+                    break;
+                case 'Telefone':
+                    $pixTypeKey = 'phone';
+                    break;
+                case 'aleatoria':
+                    $pixTypeKey = 'token';
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        $headers = [
+            'Authorization: Bearer ' . $decodedResponse['access_token'],
+            'Content-Type: application/json'
+        ];
+
+        $whitdrawAmount = $this->convertDecimalToCentsString($totalAmount);
+
+        $data = [
+            "initiation_type" => "dict",
+            "idempotent_id" => $txnInfo->tnx,
+            "value_cents" => $whitdrawAmount,
+            "pix_key_type" => $pixTypeKey ?? null,
+            "pix_key" => $pixKey ?? null,
+            "authorized" => true
+        ];
+
+        // Inicializar cURL
+        $curl = curl_init();
+
+        // Configurar opções do cURL
+        curl_setopt_array($curl, [
+            CURLOPT_URL => 'https://api.zendry.com.br/v1/pix/payments',
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => 'POST',
             CURLOPT_HTTPHEADER => $headers,

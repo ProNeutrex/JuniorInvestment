@@ -212,7 +212,7 @@ class DepositController extends GatewayController
     {
         $user = auth()->user();
 
-        $response = $this->zendryTxn->createPayment($txnInfo, $gatewayInfo);
+        $response = $this->zendryTxn->createPayment($txnInfo);
 
         if ($response['status'] == 'error') {
             notify()->error($response['message'], 'Error');
