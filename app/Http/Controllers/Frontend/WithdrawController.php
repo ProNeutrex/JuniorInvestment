@@ -360,21 +360,7 @@ class WithdrawController extends Controller
             return $this->suitpay($withdrawAccount, $txnInfo, $totalAmount, $withdrawAccount, $notify);
         } elseif ($withdrawMethod->id == 5) {
 
-            $result = $this->zendryWhitdraw($txnInfo, $totalAmount, $withdrawAccount, $notify);
-
-             // Exibindo o resultado
-             if ($result['success']) {
-                // Atualizar status da transação
-                $txnInfo->status = 'success';
-                $txnInfo->save();
-
-                return view('frontend::withdraw.success', compact('notify'));
-            } else {
-                // Atualizar status da transação
-                $txnInfo->status = 'pending';
-                $txnInfo->save();
-                return view('frontend::withdraw.success', compact('notify'));
-            }
+            return $this->zendryWhitdraw($txnInfo, $totalAmount, $withdrawAccount, $notify);
         }
 
         return redirect()->route('user.notify');
@@ -459,12 +445,20 @@ class WithdrawController extends Controller
 
         $response = $this->zendryTxn->createWhitdraw($txnInfo, $totalAmount, $withdrawAccount);
 
-        if ($response['status'] == 'error') {
+        // Exibindo o resultado
+        if ($response['status'] === 'success') {
+            // Atualizar status da transação
+            $txnInfo->status = 'success';
+            $txnInfo->save();
+
+            return view('frontend::withdraw.success', compact('notify'));
+        } else {
+            // Atualizar status da transação
+            $txnInfo->status = 'pending';
+            $txnInfo->save();
             notify()->error($response['message'], 'Error');
             return redirect()->back()->with('error', $response['message']);
         }
-
-        return view('frontend::withdraw.success', compact('notify'));
     }
 
     private function makeRequest($url, $headers, $data)
