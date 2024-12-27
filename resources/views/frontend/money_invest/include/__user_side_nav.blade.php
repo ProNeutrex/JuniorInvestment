@@ -18,10 +18,6 @@
                 <a href="{{ route('user.wallet-exchange') }}"><i
                         class="anticon anticon-transaction"></i><span>{{ __('Wallet Exchange') }}</span></a>
             </li>
-            <li class="side-nav-item {{ isActive('user.coin') }}">
-                <a href="{{ route('user.coin') }}"><i
-                        class="anticon anticon-transaction"></i><span>{{ __('Coins') }}</span></a>
-            </li>
             <li class="side-nav-item @if( Route::currentRouteName() != 'user.withdraw.log') {{ isActive('user.withdraw*') }} @endif">
                 <a href="{{ route('user.withdraw.view') }}"><i
                         class="anticon anticon-bank"></i><span>{{ __('Withdraw') }}</span></a>

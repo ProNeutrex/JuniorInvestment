@@ -68,6 +68,8 @@
                                                         name="wallet" required id="selectWallet">
                                                         <option>Selecione</option>
                                                     <option value="gateway">{{ __('Pagamento direto') }}</option>
+                                                    <option value="main">{{ __('Main Wallet ( ') . $user->balance.' '. $currency }} </option>
+                                                    <option value="profit">{{ __('Profit Wallet ( ') . $user->profit_balance.' '. $currency }} </option>
                                                 </select>
                                             </div>
 
