@@ -243,6 +243,16 @@ class WithdrawController extends Controller
      */
     public function withdrawNow(Request $request)
     {
+        date_default_timezone_set('America/Sao_Paulo');
+        $horaAtual = date('H:i');
+        $inicio = '10:00';
+        $fim = '16:00';
+        
+        if ($horaAtual < $inicio || $horaAtual > $fim) {
+           notify()->error(__('Solicite seu saque novamente das 10:00 as 16:00'), 'Error');
+           return redirect()->back();
+        }
+
         if (!setting('user_withdraw', 'permission') || !\Auth::user()->withdraw_status) {
             abort('403', __('Withdraw Disable Now'));
         }
