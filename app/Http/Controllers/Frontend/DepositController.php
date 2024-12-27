@@ -290,6 +290,26 @@ class DepositController extends GatewayController
 
     public function confirmarZendry(Request $request)
     {
+        $body = $request->all();
+        if (isset($body['referenceCode'])) {
+
+            $transaction = Transaction::where('external_reference', $body['referenceCode'])->first();
+            if ($transaction && $transaction->status->value === 'success') {
+
+                notify()->success('Depósito realizado com sucesso', 'success');
+                sleep(5);
+                return [
+                    'status' => 'paid'
+                ];
+            }
+
+            return [
+                'status' => 'pending'
+            ];
+        }
+
         $this->zendryTxn->confirmQrCodePayment($request);
+
+        return;
     }
 }

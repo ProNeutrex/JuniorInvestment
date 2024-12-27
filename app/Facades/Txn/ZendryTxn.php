@@ -18,22 +18,8 @@ class ZendryTxn
 
     public function confirmQrCodePayment(Request $request)
     {
-        // Obter o ClientSecret (cs) do gateway configurado
-        $gateway = Gateway::where('gateway_code', 'zendry')->first();
-        // $clientSecret = json_decode($gateway->credentials, true)['cs'];
-
         // Dados recebidos no webhook
         $data = $request->all();
-
-        // Será que necessita de validar o hash ou só o header ?
-        // $hashString = $data['idTransaction'] . $data['typeTransaction'] . $data['statusTransaction'] . $data['value'] . $data['payerName'] . $data['payerTaxId'] . $data['paymentDate'] . $data['paymentCode'] . $data['requestNumber'];
-        // $expectedHash = hash('sha256', $hashString . $clientSecret);
-
-        // if ($expectedHash !== $data['hash']) {
-        //     // Se o hash não for válido, rejeitar a requisição
-        //     Log::error('Hash inválido no webhook de PIX', ['data' => $data]);
-        //     return response()->json(['error' => 'Invalid hash'], 400);
-        // }
 
         $authorizationHeader = $request->header('Authorization');
 
